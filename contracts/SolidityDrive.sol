@@ -14,9 +14,9 @@ contract SolidityDrive {
         files[msg.sender].push(File({hash: _hash, fileName: _fileName, fileType: _fileType, date: _date}));
     }
 
-    function getFile(uint _index) public view returns(string memory, string memory, uint) {
+    function getFile(uint _index) public view returns(string memory, string memory, string memory, uint) {
         File memory file = files[msg.sender][_index];
-        return (file.hash, file.fileName, file.date);
+        return (file.hash, file.fileName, file.fileType, file.date);
     }
     
     function getLength() public view returns(uint) {

@@ -8,7 +8,8 @@ import "bootstrap/dist/css/bootstrap.css";
 import "./App.css";
 import { Table } from "reactstrap";
 import ipfs from "./utils/ipfs";
-import { SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS } from "constants";
+import Moment from 'react-moment';
+import { parseFile } from './utils/bigFileReader';
 
 class App extends Component {
   state = { solidityDrive: [], web3: null, accounts: null, contract: null };
@@ -70,11 +71,12 @@ class App extends Component {
           console.log(err);
           return alert(err);
         }
-        let timestamp = Date.now;
+        let timestamp = Math.round(+new Date()/1000)
         let type = name.substr(name.lastIndexOf(".") + 1);
-        await contract.methods
+        let uploaded = await contract.methods
           .add(result[0].hash, name, type, timestamp)
-          .send({ from: accounts[0], gas: 180000 });
+          .send({ from: accounts[0], gas: 300000 });
+          console.log(uploaded);
       });
     } catch (error) {
       console.log(error)
@@ -115,7 +117,10 @@ class App extends Component {
                           {item[1]}
                         </a>
                       </td>
-                      <td class="text-right">{item[2]}</td>
+                      <td class="text-right">
+                      <Moment format="YYYY/MM/DD" unix>
+                        {item[3]}
+                      </Moment></td>
                     </tr>
                   ))
                 : null}
