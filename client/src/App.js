@@ -1,70 +1,132 @@
 import React, { Component } from "react";
-import SimpleStorageContract from "./contracts/SimpleStorage.json";
+import SolidityDriveContract from "./contracts/SolidityDrive.json";
 import getWeb3 from "./utils/getWeb3";
-
+import { StyledDropZone } from "react-drop-zone";
+import FileIcon, { defaultStyles } from "react-file-icon";
+import "react-drop-zone/dist/styles.css";
+import "bootstrap/dist/css/bootstrap.css";
 import "./App.css";
+import { Table } from "reactstrap";
+import ipfs from "./utils/ipfs";
+import Moment from 'react-moment';
+import { parseFile } from './utils/bigFileReader';
 
 class App extends Component {
-  state = { storageValue: 0, web3: null, accounts: null, contract: null };
+  state = { solidityDrive: [], web3: null, accounts: null, contract: null };
 
   componentDidMount = async () => {
     try {
       // Get network provider and web3 instance.
       const web3 = await getWeb3();
-
       // Use web3 to get the user's accounts.
       const accounts = await web3.eth.getAccounts();
-
       // Get the contract instance.
       const networkId = await web3.eth.net.getId();
-      const deployedNetwork = SimpleStorageContract.networks[networkId];
+      const deployedNetwork = SolidityDriveContract.networks[networkId];
       const instance = new web3.eth.Contract(
-        SimpleStorageContract.abi,
-        deployedNetwork && deployedNetwork.address,
+        SolidityDriveContract.abi,
+        deployedNetwork && deployedNetwork.address
       );
-
       // Set web3, accounts, and contract to the state, and then proceed with an
       // example of interacting with the contract's methods.
-      this.setState({ web3, accounts, contract: instance }, this.runExample);
+      this.setState({ web3, accounts, contract: instance }, this.getFiles);
     } catch (error) {
       // Catch any errors for any of the above operations.
       alert(
-        `Failed to load web3, accounts, or contract. Check console for details.`,
+        `Failed to load web3, accounts, or contract. Check console for details.`
       );
       console.error(error);
     }
   };
 
-  runExample = async () => {
+  getFiles = async () => {
     const { accounts, contract } = this.state;
+    let filesLength = await contract.methods
+      .getLength()
+      .call({ from: accounts[0] });
+    let files = [];
+    for (let i = 0; i < filesLength; i++) {
+      let file = await contract.methods.getFile(i).call({ from: accounts[0] });
+      files.push(file);
+    }
+    this.setState({
+      solidityDrive: files
+    });
+  };
 
-    // Stores a given value, 5 by default.
-    await contract.methods.set(5).send({ from: accounts[0] });
+  onDrop = file => {
+    // POST to a test endpoint for demo purposes
+    let reader = new window.FileReader();
+    reader.readAsArrayBuffer(file);
+    reader.onloadend = () => this.handleFile(reader, file.name);
+  };
 
-    // Get the value from the contract to prove it worked.
-    const response = await contract.methods.get().call();
-
-    // Update state with the result.
-    this.setState({ storageValue: response });
+  handleFile = async (reader, name) => {
+    try {
+      const { contract, accounts } = this.state;
+      const buffer = await Buffer.from(reader.result);
+      console.log(Buffer.isBuffer(buffer));
+      ipfs.add(buffer, async (err, result) => {
+        if (err) {
+          console.log(err);
+          return alert(err);
+        }
+        let timestamp = Math.round(+new Date()/1000)
+        let type = name.substr(name.lastIndexOf(".") + 1);
+        let uploaded = await contract.methods
+          .add(result[0].hash, name, type, timestamp)
+          .send({ from: accounts[0], gas: 300000 });
+          console.log(uploaded);
+      });
+    } catch (error) {
+      console.log(error)
+      alert(error)
+    }
   };
 
   render() {
+    const { solidityDrive } = this.state;
     if (!this.state.web3) {
       return <div>Loading Web3, accounts, and contract...</div>;
     }
     return (
       <div className="App">
-        <h1>Good to Go!</h1>
-        <p>Your Truffle Box is installed and ready.</p>
-        <h2>Smart Contract Example</h2>
-        <p>
-          If your contracts compiled and migrated successfully, below will show
-          a stored value of 5 (by default).
-        </p>
-        <p>
-          Try changing the value stored on <strong>line 40</strong> of App.js.
-        </p>
-        <div>The stored value is: {this.state.storageValue}</div>
+        <div className="container pt-4">
+          <StyledDropZone onDrop={this.onDrop} multiple={true} />
+          <Table>
+            <thead>
+              <tr>
+                <th width="7%">Type</th>
+                <th class="text-left">File</th>
+                <th class="text-right">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {solidityDrive !== []
+                ? solidityDrive.map((item, key) => (
+                    <tr>
+                      <th width="7%" scope="row">
+                        <FileIcon
+                          size={30}
+                          extension={item[2]}
+                          {...defaultStyles[item[2]]}
+                        />
+                      </th>
+                      <td class="text-left">
+                        <a href={"https://gateway.ipfs.io/ipfs/" + item[0]}>
+                          {item[1]}
+                        </a>
+                      </td>
+                      <td class="text-right">
+                      <Moment format="YYYY/MM/DD" unix>
+                        {item[3]}
+                      </Moment></td>
+                    </tr>
+                  ))
+                : null}
+            </tbody>
+          </Table>
+        </div>
       </div>
     );
   }
