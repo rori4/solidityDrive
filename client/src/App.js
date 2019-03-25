@@ -8,8 +8,8 @@ import "bootstrap/dist/css/bootstrap.css";
 import "./App.css";
 import { Table } from "reactstrap";
 import ipfs from "./utils/ipfs";
-import Moment from 'react-moment';
-import { parseFile } from './utils/bigFileReader';
+import Moment from "react-moment";
+import fileReaderPullStream from "pull-file-reader";
 
 class App extends Component {
   state = { solidityDrive: [], web3: null, accounts: null, contract: null };
@@ -54,33 +54,23 @@ class App extends Component {
     });
   };
 
-  onDrop = file => {
-    // POST to a test endpoint for demo purposes
-    let reader = new window.FileReader();
-    reader.readAsArrayBuffer(file);
-    reader.onloadend = () => this.handleFile(reader, file.name);
-  };
-
-  handleFile = async (reader, name) => {
+  onDrop = async file => {
     try {
       const { contract, accounts } = this.state;
-      const buffer = await Buffer.from(reader.result);
-      console.log(Buffer.isBuffer(buffer));
-      ipfs.add(buffer, async (err, result) => {
-        if (err) {
-          console.log(err);
-          return alert(err);
-        }
-        let timestamp = Math.round(+new Date()/1000)
-        let type = name.substr(name.lastIndexOf(".") + 1);
-        let uploaded = await contract.methods
-          .add(result[0].hash, name, type, timestamp)
-          .send({ from: accounts[0], gas: 300000 });
-          console.log(uploaded);
+      const stream = fileReaderPullStream(file);
+      let result = await ipfs.add(stream, {
+        progress: prog => console.log(`received: ${prog}`)
       });
+      let timestamp = Math.round(+new Date() / 1000);
+      let type = file.name.substr(file.name.lastIndexOf(".") + 1);
+      let uploaded = await contract.methods
+        .add(result[0].hash, file.name, type, timestamp)
+        .send({ from: accounts[0], gas: 300000 });
+      console.log(uploaded);
+      this.getFiles();
     } catch (error) {
-      console.log(error)
-      alert(error)
+      console.log(error);
+      alert(error);
     }
   };
 
@@ -118,9 +108,10 @@ class App extends Component {
                         </a>
                       </td>
                       <td class="text-right">
-                      <Moment format="YYYY/MM/DD" unix>
-                        {item[3]}
-                      </Moment></td>
+                        <Moment format="YYYY/MM/DD" unix>
+                          {item[3]}
+                        </Moment>
+                      </td>
                     </tr>
                   ))
                 : null}

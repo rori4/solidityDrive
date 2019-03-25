@@ -4,10 +4,9 @@
   "private": true,
   "dependencies": {
     "bootstrap": "^4.3.1",
-    "file-to-array-buffer": "^1.0.0",
     "ipfs-api": "^26.1.2",
-    "ipfs-mini": "^1.1.5",
     "moment": "^2.24.0",
+    "pull-file-reader": "^1.0.2",
     "react": "^16.6.3",
     "react-dom": "^16.6.3",
     "react-drop-zone": "^3.0.6",
